@@ -18,7 +18,7 @@ void loop() {
     // Khi cảm biến phát hiện vạch đen (LOW) (When the sensor detects a black line)
     Serial.println("Phat hien vach den - dung lai"); // (Detects black line - stop)
     digitalWrite(in1, LOW);
-    digitalWrite(in2, LOW);
+    digitalWrite(in2, HIGH);
     analogWrite(e, 0); // Dừng động cơ (Stop motor)
   } else {
     // Khi không phát hiện vạch đen (HIGH) (When not detecting a black line)

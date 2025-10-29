@@ -4,9 +4,7 @@
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
-#define ENA_PIN 9
-#define IN1_PIN 7
-#define IN2_PIN 6
+
 
 const int MIN_SPEED = 100; // Tốc độ thấp nhất khi hoạt động (Minimum speed when active)
 const int MAX_SPEED = 255; // Tốc độ cao nhất (Maximum speed)

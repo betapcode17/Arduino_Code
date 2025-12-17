@@ -1,22 +1,20 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <Servo.h>
 
 // WiFi thông tin
-const char *ssid = "<3";
-const char *password = "baophansayhi";
+const char *ssid = "Tran Thi Kim Loan";
+const char *password = "01229333995";
 
-// Cảm biến ánh sáng và động cơ DC
+// Cảm biến ánh sáng và servo
 #define lightSensor A0
-#define in1 D1 // Motor direction pin 1
-#define in2 D2 // Motor direction pin 2
-#define motorSpeedPin D4 // Motor speed PWM controllight
+#define servoPin D1
 
-int lightValue = 0; // Giá trị cảm biến ánh sáng
-int motorSpeed = 0; // Tốc độ động cơ từ web
-
-// Trạng thái quay của động cơ
-String motorState = "Stopped";
+Servo myServo;
+int lightValue = 0;      // Giá trị cảm biến ánh sáng
+int angleConditionMet = 0;     // Góc khi thỏa điều kiện ánh sáng
+int angleConditionNotMet = 0;  // Góc khi không thỏa điều kiện ánh sáng
 
 // Tạo web server
 AsyncWebServer server(80);
@@ -26,23 +24,23 @@ const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motor Control</title>
+  <title>Servo Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <h1>Motor Control</h1>
+  <h1>Servo Control</h1>
   <p>Light Sensor Value: <span id="light">%LIGHT%</span></p>
-  <p>Motor State: <span id="state">%STATE%</span></p>
-  
-  <form id="motorForm">
-    <label for="speed">Speed (0-255): </label>
-    <input type="number" name="speed" min="0" max="255" value="0" required>
+  <form id="servoForm">
+    <label for="angleMet">Angle (Condition Met): </label>
+    <input type="number" name="angleMet" min="0" max="180" required>
+    <br>
+    <label for="angleNotMet">Angle (Condition Not Met): </label>
+    <input type="number" name="angleNotMet" min="0" max="180" required>
     <br><br>
     <input type="submit" value="Update">
   </form>
-
   <script>
-    document.getElementById('motorForm').addEventListener('submit', function (e) {
+    document.getElementById('servoForm').addEventListener('submit', function (e) {
       e.preventDefault();
       const formData = new FormData(this);
       fetch("/", {
@@ -56,7 +54,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         .then(response => response.json())
         .then(data => {
           document.getElementById("light").innerHTML = data.light;
-          document.getElementById("state").innerHTML = data.state;
         })
         .catch(error => console.error("Error:", error));
     }, 2000);
@@ -74,9 +71,6 @@ int readLightSensor() {
 String processor(const String &var) {
   if (var == "LIGHT") {
     return String(lightValue);
-  }
-  if (var == "STATE") {
-    return motorState;
   }
   return String();
 }
@@ -100,11 +94,10 @@ void setup() {
   // Khởi tạo WiFi
   initWiFi();
 
-  // Khởi tạo cảm biến và động cơ DC
+  // Khởi tạo cảm biến và servo
   pinMode(lightSensor, INPUT);
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
-  pinMode(motorSpeedPin, OUTPUT);
+  myServo.attach(servoPin);
+  myServo.write(0);
 
   // Cấu hình Web Server
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -112,15 +105,19 @@ void setup() {
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String jsonResponse = "{\"light\":\"" + String(lightValue) + "\",\"state\":\"" + motorState + "\"}";
+    String jsonResponse = "{\"light\":\"" + String(lightValue) + "\"}";
     request->send(200, "application/json", jsonResponse);
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("speed", true)) {
-      motorSpeed = request->getParam("speed", true)->value().toInt();
-      Serial.print("Updated motor speed: ");
-      Serial.println(motorSpeed);
+    if (request->hasParam("angleMet", true) && request->hasParam("angleNotMet", true)) {
+      angleConditionMet = request->getParam("angleMet", true)->value().toInt();
+      angleConditionNotMet = request->getParam("angleNotMet", true)->value().toInt();
+      Serial.print("Updated angles: ");
+      Serial.print("Condition Met: ");
+      Serial.print(angleConditionMet);
+      Serial.print(", Condition Not Met: ");
+      Serial.println(angleConditionNotMet);
     }
     request->send(200, "text/plain", "Settings updated");
   });
@@ -133,25 +130,13 @@ void loop() {
   lightValue = readLightSensor();
   Serial.print("Light Sensor Value:");
   Serial.println(lightValue);
-
-   // Kiểm tra tốc độ động cơ và điều chỉnh trạng thái
-  if (motorSpeed == 0) {
-    motorState = "Stopped";
-    digitalWrite(in1, LOW);  // Dừng động cơ
-    digitalWrite(in2, LOW);  // Dừng động cơ
-  } else {
-    // Điều khiển động cơ DC dựa trên giá trị cảm biến ánh sáng
-    if (lightValue > 700) {  // Điều kiện ánh sáng yếu
-      motorState = "Running Clockwise";
-      digitalWrite(in1, HIGH);
-      digitalWrite(in2, LOW);
-    } else {  // Điều kiện ánh sáng mạnh
-      motorState = "Running Counterclockwise";
-      digitalWrite(in1, LOW);
-      digitalWrite(in2, HIGH);
-    }
+  // Điều khiển servo dựa trên giá trị cảm biến ánh sáng
+  if (lightValue > 800) { // Điều kiện ánh sáng mạnh
+    myServo.write(angleConditionMet);
+  } else { // Điều kiện ánh sáng yếu
+    myServo.write(angleConditionNotMet);
   }
-
-  // Điều chỉnh tốc độ động cơ DC theo giá trị từ web
-  analogWrite(motorSpeedPin, motorSpeed);
+  delay(500);
+  myServo.write(0);
+  delay(500);
 }

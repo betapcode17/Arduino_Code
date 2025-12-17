@@ -3,8 +3,8 @@
 #include <ESPAsyncWebServer.h>
 
 // Thông tin WiFi
-const char *ssid = "Tran Thi Kim Loan";
-const char *password = "01229333995";
+const char *ssid = "<3";
+const char *password = "baophansayhi";
 
 // Định nghĩa chân cho cảm biến siêu âm và động cơ DC
 const int trigPin = D5;  // Chân trigger

@@ -3,8 +3,8 @@
 #include <ESPAsyncWebServer.h>
 
 // Replace with your network credentials
-const char *ssid = "Tran Thi Kim Loan";
-const char *password = "01229333995";
+const char *ssid = "<3";
+const char *password = "baophansayhi";
 
 // Define GPIO pins for DC Motor
 #define lineSensor D5

@@ -23,13 +23,13 @@ void loop() {
     Serial.println(IrReceiver.decodedIRData.protocol, DEC);
     if (IrReceiver.decodedIRData.decodedRawData == 0x101) {
       Serial.println("decode");
-      myservo.write(150);
+      myservo.write(180);
       delay(500);
       myservo.write(0);
       delay(500);
     } else if (IrReceiver.decodedIRData.decodedRawData == 0x102) {
       Serial.println("decode2");
-      myservo.write(50);
+      myservo.write(90);
       delay(500);
       myservo.write(0);
       delay(500);

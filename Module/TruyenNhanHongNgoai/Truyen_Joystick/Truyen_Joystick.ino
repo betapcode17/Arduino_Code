@@ -3,7 +3,7 @@
 int JoyStickX = 1; //A1
 int JoyStickY = 2; // A2
 int JoyStickZ = 4;
-
+#define PIN_SEND 3
 bool joystick(int thresholdX = 550, int thresholdY = 550, int thresholdZ = 0) {
   int x, y, z;
   x = analogRead(JoyStickX);
@@ -19,7 +19,7 @@ bool joystick(int thresholdX = 550, int thresholdY = 550, int thresholdZ = 0) {
 }
 void setup() { 
   Serial.begin(9600);
-  IrSender.begin(3); 
+  IrSender.begin(PIN_SEND); // Chân 3 truyền 
   pinMode(JoyStickZ, INPUT_PULLUP);
 } 
 void loop(){

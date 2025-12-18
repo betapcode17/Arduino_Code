@@ -1,6 +1,6 @@
-int in1 = 7;    // IN1 driver
+int in1 = 5;    // IN1 driver
 int in2 = 6;    // IN2 driver
-int e = 9;      // ENA (PWM)
+int e = 3;      // ENA (PWM)
 int sensor = 8; // Chân D0 của cảm biến dò line (D0 pin of the line sensor)
 
 void setup() {

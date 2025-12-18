@@ -28,10 +28,10 @@ void loop() {
   Serial.println("cm"); 
 
   if (distance < 20) {
-    IrSender.sendRC5(0x1, 8);  // Truyền mã 0x1 với độ dài 8 bit
+    IrSender.sendRC5(0x101, 8);  // Truyền mã 0x1 với độ dài 8 bit
     delay(200);
   } else {
-    IrSender.sendRC5(0x2, 8);  // Truyền mã 0x2 với độ dài 8 bit
+    IrSender.sendRC5(0x102, 8);  // Truyền mã 0x2 với độ dài 8 bit
     delay(200);
   }    
   delay(500);

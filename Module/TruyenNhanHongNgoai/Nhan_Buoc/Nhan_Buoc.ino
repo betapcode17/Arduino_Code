@@ -3,7 +3,7 @@
 #define PIN_RECV 2
 
 const int stepsPerRevolution = 2048;
-Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 11);
+Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 12);
 
 IRrecv receiver(PIN_RECV);
 decode_results output;
@@ -21,7 +21,7 @@ void setup() {
 }
 
 void loop() {
-  if (IrReceiver.decode(&output)) {
+  if (IrReceiver.decode()) {
     Serial.print("Mã IR nhận được: 0x");
     Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);  // In ra mã IR nhận được
     Serial.print("Giao thức: ");

@@ -4,7 +4,7 @@
 #include <SoftwareSerial.h>
 #include <Servo.h> 
 #define Servo_PWM 6 
-SoftwareSerial BTSerial(10, 11); // RX | TX
+SoftwareSerial BTSerial(10, 11); 
 // Connect the HC-05 TX to Arduino pin 10
 // Connect the HC-05 RX to Arduino pin 11
 Servo MG995_Servo; 
@@ -34,7 +34,7 @@ void loop() {
     }
     else {
       Serial.println("decode2");
-      MG995_Servo.write(45);
+      MG995_Servo.write(180);
       delay(1000);
       MG995_Servo.write(0);
       delay(1000);

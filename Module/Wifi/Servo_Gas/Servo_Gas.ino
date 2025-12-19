@@ -3,23 +3,25 @@
 #include <ESPAsyncWebServer.h>
 #include <Servo.h>
 
-// WiFi thông tin
-const char *ssid = "D320";
-const char *password = "20012005";
+// ================= WiFi =================
+const char *ssid = "NGOC HOA";
+const char *password = "home1234";
 
-// Cảm biến khí gas và servo
-#define gasSensor A0      // Chân analog để đọc giá trị cảm biến khí gas
-#define servoPin D1       // Chân servo
+// ================= PHẦN CỨNG =================
+#define gasSensor A0
+#define servoPin  D1
 
 Servo myServo;
-int gasValue = 0;        // Giá trị cảm biến khí gas
-int angleConditionMet = 0;     // Góc khi có khí gas
-int angleConditionNotMet = 0;  // Góc khi không có khí gas
 
-// Tạo web server
+// ================= BIẾN =================
+int gasValue = 0;
+int angleConditionMet = 0;
+int angleConditionNotMet = 0;
+
+// ================= WEB SERVER =================
 AsyncWebServer server(80);
 
-// HTML giao diện web
+// ================= HTML =================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -28,116 +30,124 @@ const char index_html[] PROGMEM = R"rawliteral(
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <h1>Servo Control</h1>
-  <p>Gas Sensor Value: <span id="gas">%GAS%</span></p>
+  <h2>ESP8266 Gas + Servo</h2>
+  <p>Gas Sensor Value: <b><span id="gas">%GAS%</span></b></p>
+
   <form id="servoForm">
-    <label for="angleMet">Angle (Gas Detected): </label>
-    <input type="number" name="angleMet" min="0" max="180" required>
-    <br>
-    <label for="angleNotMet">Angle (No Gas Detected): </label>
-    <input type="number" name="angleNotMet" min="0" max="180" required>
-    <br><br>
+    <label>Angle (Gas Detected):</label><br>
+    <input type="number" name="angleMet" min="0" max="180" required><br><br>
+
+    <label>Angle (No Gas):</label><br>
+    <input type="number" name="angleNotMet" min="0" max="180" required><br><br>
+
     <input type="submit" value="Update">
   </form>
+
   <script>
-    document.getElementById('servoForm').addEventListener('submit', function (e) {
+    document.getElementById("servoForm").addEventListener("submit", function(e){
       e.preventDefault();
-      const formData = new FormData(this);
-      fetch("/", {
-        method: "POST",
-        body: formData
-      }).then(response => response.text()).catch(error => console.error("Error:", error));
+      fetch("/", { method:"POST", body:new FormData(this) });
     });
 
-    setInterval(function() {
+    setInterval(() => {
       fetch("/status")
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById("gas").innerHTML = data.gas;
-        })
-        .catch(error => console.error("Error:", error));
+        .then(r => r.json())
+        .then(d => document.getElementById("gas").innerHTML = d.gas);
     }, 2000);
   </script>
 </body>
 </html>
 )rawliteral";
 
-// Đọc giá trị cảm biến khí gas
+// ================= HÀM =================
 int readGasSensor() {
   return analogRead(gasSensor);
 }
 
-// Xử lý HTML
+// 🔥 QUAN TRỌNG: CHUYỂN GÓC → XUNG
+int angleToPulse(int angle) {
+  angle = constrain(angle, 0, 180);
+  return map(angle, 0, 180, 500, 2500);
+}
+
 String processor(const String &var) {
-  if (var == "GAS") {
-    return String(gasValue);
-  }
+  if (var == "GAS") return String(gasValue);
   return String();
 }
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
+  Serial.print("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
+    delay(500);
+    Serial.print(".");
   }
-  Serial.println("\nConnected to WiFi! IP Address: ");
+  Serial.println("\nConnected! IP: ");
   Serial.println(WiFi.localIP());
 }
 
+// ================= SETUP =================
 void setup() {
-  // Khởi tạo Serial Monitor
   Serial.begin(9600);
 
-  // Khởi tạo WiFi
   initWiFi();
+Serial.println("================================");
+Serial.println("ESP8266 Web Server Started");
+Serial.print("Web Address: http://");
+Serial.println(WiFi.localIP());
+Serial.println("================================");
+ 
 
-  // Khởi tạo cảm biến và servo
+
   pinMode(gasSensor, INPUT);
-  myServo.attach(servoPin);
-  myServo.write(0);
 
-  // Cấu hình Web Server
+  // ⚠️ ATTACH SERVO CHUẨN ESP8266
+  myServo.attach(servoPin, 500, 2500);
+  myServo.writeMicroseconds(angleToPulse(0));
+
+  // ===== WEB =====
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String jsonResponse = "{\"gas\":\"" + String(gasValue) + "\"}";
-    request->send(200, "application/json", jsonResponse);
+    request->send(200, "application/json",
+      "{\"gas\":\"" + String(gasValue) + "\"}");
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("angleMet", true) && request->hasParam("angleNotMet", true)) {
+    if (request->hasParam("angleMet", true))
       angleConditionMet = request->getParam("angleMet", true)->value().toInt();
+
+    if (request->hasParam("angleNotMet", true))
       angleConditionNotMet = request->getParam("angleNotMet", true)->value().toInt();
-      Serial.print("Updated angles: ");
-      Serial.print("Gas Detected: ");
-      Serial.print(angleConditionMet);
-      Serial.print(", No Gas Detected: ");
-      Serial.println(angleConditionNotMet);
-    }
-    request->send(200, "text/plain", "Settings updated");
+
+    Serial.print("Gas: ");
+    Serial.print(angleConditionMet);
+    Serial.print(" | No Gas: ");
+    Serial.println(angleConditionNotMet);
+
+    request->send(200, "text/plain", "OK");
   });
 
   server.begin();
 }
 
 void loop() {
-  // Đọc giá trị cảm biến khí gas
   gasValue = readGasSensor();
-  Serial.print("Gas Sensor Value:");
   Serial.println(gasValue);
-  
-  // Điều khiển servo dựa trên giá trị cảm biến khí gas
-  if (gasValue > 120) { // Điều kiện phát hiện khí gas
-    myServo.write(angleConditionMet);
-  } else { // Không phát hiện khí gas
-    myServo.write(angleConditionNotMet);
+
+  // Quay tới góc theo trạng thái gas
+  if (gasValue > 120) {
+    myServo.writeMicroseconds(angleToPulse(angleConditionMet));
+  } else {
+    myServo.writeMicroseconds(angleToPulse(angleConditionNotMet));
   }
-  delay(500);
-  myServo.write(0);
-  delay(500);
+
+  delay(500);   // Giữ góc 300ms
+  // Quay về 0 độ
+  myServo.writeMicroseconds(angleToPulse(0));
+  delay(500);   // Giữ 0 độ 300ms
 }
+

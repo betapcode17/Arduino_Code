@@ -4,8 +4,8 @@
 #include <Stepper.h>
 
 // Thông tin WiFi
-const char *ssid = "Tran Thi Kim Loan";
-const char *password = "01229333995";
+const char *ssid = "NGOC HOA";
+const char *password = "home1234";
 
 // Định nghĩa chân cho cảm biến siêu âm và động cơ bước
 const int trigPin = D5;  // Chân trigger
@@ -113,7 +113,7 @@ void setup() {
   pinMode(echoPin, INPUT);
 
   // Cấu hình động cơ bước
-  myStepper.setSpeed(5);
+  myStepper.setSpeed(10);
 
   // Web server routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {

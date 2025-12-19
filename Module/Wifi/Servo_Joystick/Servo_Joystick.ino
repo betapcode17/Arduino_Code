@@ -3,141 +3,143 @@
 #include <ESPAsyncWebServer.h>
 #include <Servo.h>
 
-// WiFi thông tin
-const char *ssid = "D320";
-const char *password = "20012005";
+// ================= WIFI =================
+const char *ssid = "NGOC HOA";
+const char *password = "home1234";
 
-// Cảm biến joystick và servo
-#define joystickX A0     // Chân analog cho trục X của joystick
-#define servoPin D1      // Chân servo
+// ================= PIN =================
+#define joystickX A0
+#define servoPin D1
 
+// ================= OBJECT =================
 Servo myServo;
-int joystickValue = 0;       // Giá trị trục X của joystick
-int angleConditionMet = 0;   // Góc khi joystick vượt ngưỡng
-int angleConditionNotMet = 0; // Góc khi joystick nhỏ hơn ngưỡng
-int joystickThreshold = 550; // Ngưỡng giá trị của joystick
-
-// Tạo web server
 AsyncWebServer server(80);
 
-// HTML giao diện web
+// ================= BIẾN =================
+int joystickValue = 0;
+int angleConditionMet = 90;
+int angleConditionNotMet = 0;
+int joystickThreshold = 550;
+
+// ================= HTML =================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Servo Control</title>
+  <title>Joystick Servo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <h1>Servo Control</h1>
+  <h1>Joystick Servo Control</h1>
   <p>Joystick X Value: <span id="joystick">%JOYSTICK%</span></p>
+
   <form id="servoForm">
-    <label for="angleMet">Angle (Condition Met): </label>
-    <input type="number" id="angleMet" name="angleMet" min="0" max="180" required>
-    <br>
-    <label for="angleNotMet">Angle (Condition Not Meet): </label>
-    <input type="number" id="angleNotMet" name="angleNotMet" min="0" max="180" required>
-    <br><br>
+    <label>Angle (Joystick > Threshold): </label>
+    <input type="number" name="angleMet" min="0" max="180" required><br>
+    <label>Angle (Joystick <= Threshold): </label>
+    <input type="number" name="angleNotMet" min="0" max="180" required><br><br>
     <input type="submit" value="Update">
   </form>
+
   <script>
-    document.getElementById('servoForm').addEventListener('submit', function (e) {
+    document.getElementById("servoForm").addEventListener("submit", function(e){
       e.preventDefault();
-      const formData = new FormData(this);
-      fetch("/", {
-        method: "POST",
-        body: formData
-      }).then(response => response.text()).catch(error => console.error("Error:", error));
+      fetch("/", { method: "POST", body: new FormData(this) });
     });
 
-    setInterval(function() {
+    setInterval(() => {
       fetch("/status")
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById("joystick").innerHTML = data.joystick;
-        })
-        .catch(error => console.error("Error:", error));
-    }, 2000);
+        .then(r => r.json())
+        .then(d => document.getElementById("joystick").innerHTML = d.joystick);
+    }, 1000);
   </script>
 </body>
 </html>
 )rawliteral";
 
-// Đọc giá trị trục X của joystick
+int angleToPulse(int angle) {
+  angle = constrain(angle, 0, 180);
+  return map(angle, 0, 180, 1000, 2000);
+}
+
+
+// ================= READ JOYSTICK =================
 int readJoystickX() {
   return analogRead(joystickX);
 }
 
-// Xử lý HTML
+// ================= HTML PROCESS =================
 String processor(const String &var) {
-  if (var == "JOYSTICK") {
-    return String(joystickValue);
-  } else return String();
+  if (var == "JOYSTICK") return String(joystickValue);
+  return String();
 }
 
+// ================= WIFI =================
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
+  Serial.print("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
+    delay(500);
+    Serial.print(".");
   }
-  Serial.println("\nConnected to WiFi! IP Address: ");
+  Serial.println("\n==============================");
+  Serial.print("Web address: http://");
   Serial.println(WiFi.localIP());
+  Serial.println("==============================");
 }
 
+// ================= SETUP =================
 void setup() {
-  // Khởi tạo Serial Monitor
   Serial.begin(9600);
-
-  // Khởi tạo WiFi
   initWiFi();
 
-  // Khởi tạo joystick và servo
   pinMode(joystickX, INPUT);
   myServo.attach(servoPin);
-  myServo.write(90); // Servo bắt đầu ở góc giữa
+  myServo.writeMicroseconds(angleToPulse(90)); // về giữa
 
-  // Cấu hình Web Server
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String jsonResponse = "{\"joystick\":\"" + String(joystickValue) + "\"}";
-    request->send(200, "application/json", jsonResponse);
+    request->send(200, "application/json",
+      "{\"joystick\":\"" + String(joystickValue) + "\"}");
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("angleMet", true) && request->hasParam("angleNotMet", true)) {
+    if (request->hasParam("angleMet", true))
       angleConditionMet = request->getParam("angleMet", true)->value().toInt();
+
+    if (request->hasParam("angleNotMet", true))
       angleConditionNotMet = request->getParam("angleNotMet", true)->value().toInt();
-      Serial.print("Updated angles: ");
-      Serial.print("Condition Met: ");
-      Serial.print(angleConditionMet);
-      Serial.print(", Condition Not Met: ");
-      Serial.println(angleConditionNotMet);
-    }
-    request->send(200, "text/plain", "Settings updated");
+
+    Serial.print("Updated: ");
+    Serial.print(angleConditionMet);
+    Serial.print(" | ");
+    Serial.println(angleConditionNotMet);
+
+    request->send(200, "text/plain", "OK");
   });
 
   server.begin();
 }
 
+// ================= LOOP =================
 void loop() {
-  // Đọc giá trị trục X của joystick
   joystickValue = readJoystickX();
-  Serial.print("Joystick X Value: ");
+  Serial.print("Joystick: ");
   Serial.println(joystickValue);
 
-  // Điều khiển servo dựa trên giá trị joystick
   if (joystickValue > joystickThreshold) {
-    myServo.write(angleConditionMet);
+    myServo.writeMicroseconds(angleToPulse(angleConditionMet));
   } else {
-    myServo.write(angleConditionNotMet);
+    myServo.writeMicroseconds(angleToPulse(angleConditionNotMet));
   }
-  delay(500);
-  myServo.write(0);
-  delay(500);
+
+  delay(300);
+
+  // Quay về 0 độ
+  myServo.writeMicroseconds(angleToPulse(0));
+  delay(300);
 }

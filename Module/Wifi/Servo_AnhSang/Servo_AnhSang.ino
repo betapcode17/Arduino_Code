@@ -70,7 +70,7 @@ int readLightSensor() {
 // 🔥 CHUYỂN GÓC → XUNG SERVO (CHUẨN ESP8266)
 int angleToPulse(int angle) {
   angle = constrain(angle, 0, 180);
-  return map(angle, 0, 180, 500, 2500);
+  return map(angle, 0, 180, 1000, 2000);
 }
 
 // Xử lý HTML

@@ -65,11 +65,11 @@ int readLineSensor() {
   return digitalRead(lineSensorPin);
 }
 
-// 🔥 CHUYỂN GÓC → XUNG SERVO
 int angleToPulse(int angle) {
   angle = constrain(angle, 0, 180);
-  return map(angle, 0, 180, 500, 2500);
+  return map(angle, 0, 180, 1000, 2000);
 }
+
 
 String processor(const String &var) {
   if (var == "SENSORSTATE") return lineSensorStateStr;

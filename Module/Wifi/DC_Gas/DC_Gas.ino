@@ -2,166 +2,154 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-// Thông tin WiFi
+/* ================= WIFI ================= */
 const char *ssid = "Tran Thi Kim Loan";
 const char *password = "01229333995";
 
-// Định nghĩa chân cho cảm biến khí gas và động cơ DC
+/* ================= PHẦN CỨNG ================= */
 #define gasSensor A0
 #define motorPin1 D1
 #define motorPin2 D2
 #define motorSpeedPin D3
 
-// Các biến cho động cơ DC
-int motorSpeed = 0;  // Tốc độ động cơ
-String direction = "Stopped";  // Chiều quay ban đầu là dừng
-
-// Tạo web server
+/* ================= BIẾN ================= */
 AsyncWebServer server(80);
+int motorSpeed = 0;        // 0-255
+int motorDirection = 0;    // 0 = Stop, 1 = Clockwise, 2 = Counter Clockwise
+String motorState = "Stopped";
 
-// Đọc giá trị từ cảm biến khí gas
-int readGasSensor() {
-  return analogRead(gasSensor);  // Đọc giá trị từ cảm biến khí gas
-}
-
-// HTML giao diện web
+/* ================= HTML ================= */
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>DC Motor Control</title>
+  <title>DC Motor & Gas Sensor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <h1>DC Motor Control</h1>
-  <p>Gas Sensor Value: <span id="gas">%GAS%</span></p>
-  <p>Motor Direction: <span id="direction">%DIRECTION%</span></p>
+  <h2>ESP8266 Motor Control</h2>
+  <h3>Gas Sensor:</h3>
+  <p>Value: <span id="gas">%GAS%</span></p>
+
+  <h3>Motor Status:</h3>
+  <p>Direction: <span id="direction">%DIRECTION%</span></p>
+
   <form id="motorForm">
-    <label for="speed">Motor Speed (0-255): </label>
-    <input type="number" name="speed" min="0" max="255" required>
-    <input type="submit" value="Set Speed">
+    <label>Speed (0-255):</label><br>
+    <input type="number" name="speed" min="0" max="255"><br><br>
+
+    <label>Direction:</label><br>
+    <select name="direction">
+      <option value="0">Stop</option>
+      <option value="1">Clockwise</option>
+      <option value="2">Counter Clockwise</option>
+    </select><br><br>
+
+    <input type="submit" value="Update">
   </form>
+
   <script>
-    document.getElementById('motorForm').addEventListener('submit', function (e) {
+    document.getElementById("motorForm").addEventListener("submit", function(e){
       e.preventDefault();
-      const formData = new FormData(this);
-      fetch("/", {
-        method: "POST",
-        body: formData
-      }).then(response => response.text()).catch(error => console.error("Error:", error));
+      fetch("/", { method:"POST", body:new FormData(this) });
     });
 
-    setInterval(function() {
+    setInterval(() => {
       fetch("/status")
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
           document.getElementById("gas").innerHTML = data.gas;
           document.getElementById("direction").innerHTML = data.direction;
-        })
-        .catch(error => console.error("Error:", error));
+        });
     }, 2000);
   </script>
 </body>
 </html>
 )rawliteral";
 
-// Hàm xử lý HTML
+/* ================= HTML PROCESSOR ================= */
 String processor(const String &var) {
-  if (var == "GAS") {
-    return String(readGasSensor());  // Hiển thị giá trị cảm biến khí gas
-  } else if (var == "DIRECTION") {
-    return direction;  // Hiển thị chiều quay của động cơ
-  }
+  if (var == "GAS") return String(analogRead(gasSensor));
+  if (var == "DIRECTION") return motorState;
   return String();
 }
 
+/* ================= WIFI ================= */
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
+    delay(500);
+    Serial.print(".");
   }
-  Serial.println("\nConnected to WiFi! IP Address: ");
+  Serial.println("\nWiFi Connected!");
   Serial.println(WiFi.localIP());
 }
 
+/* ================= SETUP ================= */
 void setup() {
-  // Khởi tạo Serial Monitor
   Serial.begin(9600);
-
-  // Khởi tạo kết nối WiFi
   initWiFi();
 
-  // Khởi tạo chân cảm biến khí gas và động cơ DC
   pinMode(gasSensor, INPUT);
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
   pinMode(motorSpeedPin, OUTPUT);
 
-  // Web server routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String jsonResponse = "{\"gas\":\"" + String(readGasSensor()) + "\",\"direction\":\"" + direction + "\"}";
-    request->send(200, "application/json", jsonResponse);
+    String json = "{\"gas\":\"" + String(analogRead(gasSensor)) +
+                  "\",\"direction\":\"" + motorState + "\"}";
+    request->send(200, "application/json", json);
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("speed", true)) {
+    if (request->hasParam("speed", true))
       motorSpeed = request->getParam("speed", true)->value().toInt();
-      Serial.print("Motor speed set to: ");
-      Serial.println(motorSpeed);
-    }
-    request->send(200, "text/plain", "Settings updated");
+
+    if (request->hasParam("direction", true))
+      motorDirection = request->getParam("direction", true)->value().toInt();
+
+    request->send(200, "text/plain", "OK");
   });
 
   server.begin();
 }
 
+/* ================= LOOP ================= */
 void loop() {
-  static unsigned long lastGasRead = 0;
-  const unsigned long gasInterval = 500;  // Khoảng thời gian đọc cảm biến khí gas (ms)
+  // --------- Đọc cảm biến khí gas (chỉ hiển thị) ---------
+  int gasValue = analogRead(gasSensor);
 
-  static String prevDirection = "";   // Lưu chiều quay trước đó
-
-  // Đọc giá trị cảm biến khí gas theo chu kỳ
-  if (millis() - lastGasRead >= gasInterval) {
-    lastGasRead = millis();
-    int gasValue = readGasSensor();
-    
-    // Điều chỉnh chiều quay của động cơ dựa trên giá trị cảm biến khí gas
-    if (gasValue > 200) {
-      direction = "Counterclockwise";  // Quay ngược khi giá trị khí gas cao
+  // --------- Điều khiển động cơ theo web ---------
+  switch (motorDirection) {
+    case 0:
+      motorState = "Stopped";
       digitalWrite(motorPin1, LOW);
-      digitalWrite(motorPin2, HIGH);
-    } else {
-      direction = "Clockwise";         // Quay thuận khi giá trị khí gas thấp
+      digitalWrite(motorPin2, LOW);
+      break;
+    case 1:
+      motorState = "Clockwise";
       digitalWrite(motorPin1, HIGH);
       digitalWrite(motorPin2, LOW);
-    }
-
-    // In thông tin thay đổi nếu có
-    if (direction != prevDirection) {
-      prevDirection = direction;
-      Serial.print("Gas Sensor Value: ");
-      Serial.println(gasValue);
-      Serial.print("Motor Direction: ");
-      Serial.println(direction);
-      Serial.println();
-    }
+      break;
+    case 2:
+      motorState = "Counter Clockwise";
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, HIGH);
+      break;
   }
 
-  // Nếu tốc độ là 0, dừng động cơ
-  if (motorSpeed == 0) {
-    direction = "Stopped";
-    digitalWrite(motorPin1, LOW);
-    digitalWrite(motorPin2, LOW);
-  } else {
-    // Điều chỉnh tốc độ động cơ
-    analogWrite(motorSpeedPin, motorSpeed);
-  }
+  analogWrite(motorSpeedPin, motorSpeed);
+
+  // In debug
+  Serial.print("Gas Sensor: "); Serial.print(gasValue);
+  Serial.print(" | Motor: "); Serial.print(motorState);
+  Serial.print(" | Speed: "); Serial.println(motorSpeed);
+
+  delay(200);
 }

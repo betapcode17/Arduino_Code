@@ -1,170 +1,338 @@
+// #include <ESP8266WiFi.h>
+// #include <ESPAsyncTCP.h>
+// #include <ESPAsyncWebServer.h>
+
+// // Replace with your network credentials
+// const char *ssid = "<3";
+// const char *password = "baophansayhi";
+
+// // Define GPIO pins for DC Motor
+// #define lineSensor D5
+// #define motorPin1 D1
+// #define motorPin2 D2
+// #define motorSpeedPin D4
+
+// // Create AsyncWebServer object on port 80
+// AsyncWebServer server(80);
+
+// // Variables to save values from HTML form
+// const char *PARAM_INPUT = "speed";
+
+// String direction = "Stopped";  // Motor direction
+// int motorSpeed = 0;           // Motor speed (0-255)
+
+// // Read line sensor
+// String readLineSensor() {
+//   return (digitalRead(lineSensor) == HIGH) ? "black" : "white";
+// }
+
+// // HTML content
+// const char index_html[] PROGMEM = R"rawliteral(
+// <!DOCTYPE html>
+// <html>
+// <head>
+//   <title>DC Motor & Sensor</title>
+//   <meta name="viewport" content="width=device-width, initial-scale=1">
+// </head>
+// <body>
+//   <h1>DC Motor Control</h1>
+//   <h2>Sensor Reading</h2>
+//   <p>Line Sensor Status: <span id="line">%LINE%</span></p>
+//   <h2>Motor Status</h2>
+//   <p>Motor Direction: <span id="direction">%DIRECTION%</span></p>
+//   <form id="motorForm">
+//     <label for="speed">Motor Speed (0-255): </label>
+//     <input type="number" name="speed" min="0" max="255" required>
+//     <input type="submit" value="Set Speed">
+//   </form>
+//   <script>
+//     document.getElementById('motorForm').addEventListener('submit', function (e) {
+//       e.preventDefault();
+//       const formData = new FormData(this);
+//       fetch("/", {
+//         method: "POST",
+//         body: formData
+//       }).then(response => response.text()).catch(error => console.error("Error:", error));
+//     });
+
+//     setInterval(function() {
+//       fetch("/status")
+//         .then(response => response.json())
+//         .then(data => {
+//           document.getElementById("line").innerHTML = data.line;
+//           document.getElementById("direction").innerHTML = data.direction;
+//         })
+//         .catch(error => console.error("Error:", error));
+//     }, 2000);
+//   </script>
+// </body>
+// </html>
+// )rawliteral";
+
+// // Replace placeholder in HTML
+// String processor(const String &var) {
+//   if (var == "LINE") {
+//     return readLineSensor();
+//   } else if (var == "DIRECTION") {
+//     return direction;
+//   }
+//   return String();
+// }
+
+// void initWiFi() {
+//   WiFi.mode(WIFI_STA);
+//   WiFi.begin(ssid, password);
+//   Serial.print("Connecting to WiFi");
+//   while (WiFi.status() != WL_CONNECTED) {
+//     Serial.print('.');
+//     delay(1000);
+//   }
+//   Serial.println("\nConnected! IP Address: ");
+//   Serial.println(WiFi.localIP());
+// }
+
+// void setup() {
+//   // Initialize Serial Monitor
+//   Serial.begin(9600);
+
+//   // Initialize WiFi
+//   initWiFi();
+
+//   // Set up line sensor
+//   pinMode(lineSensor, INPUT);
+
+//   // Set up motor control pins
+//   pinMode(motorPin1, OUTPUT);
+//   pinMode(motorPin2, OUTPUT);
+//   pinMode(motorSpeedPin, OUTPUT);
+
+//   // Web server routes
+//   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+//     request->send_P(200, "text/html", index_html, processor);
+//   });
+
+//   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+//     String jsonResponse = "{\"line\":\"" + readLineSensor() + "\",\"direction\":\"" + direction + "\"}";
+//     request->send(200, "application/json", jsonResponse);
+//   });
+
+//   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
+//     if (request->hasParam(PARAM_INPUT, true)) {
+//       motorSpeed = request->getParam(PARAM_INPUT, true)->value().toInt();
+//       Serial.print("Motor speed set to: ");
+//       Serial.println(motorSpeed);
+//     }
+//     request->send(200, "text/plain", "Settings updated");
+//   });
+
+//   // Start server
+//   server.begin();
+// }
+
+// void loop() {
+//   static String prevDirection = "";   // Previous motor direction
+//   static String prevSensorStatus = ""; // Previous sensor status
+
+//   // Read sensor status
+//   String sensorStatus = readLineSensor();
+
+//   // Determine motor direction based on sensor status
+//   if (sensorStatus == "white" && motorSpeed > 0) {
+//     direction = "Clockwise";
+//     digitalWrite(motorPin1, LOW);
+//     digitalWrite(motorPin2, HIGH);
+//   } else if (sensorStatus == "black" && motorSpeed > 0) {
+//     direction = "Counterclockwise";
+//     digitalWrite(motorPin1, HIGH);
+//     digitalWrite(motorPin2, LOW);
+//   } else if (motorSpeed == 0) {
+//     direction = "Stopped";
+//     // Stop the motor
+//     digitalWrite(motorPin1, LOW);
+//     digitalWrite(motorPin2, LOW);
+//   }
+
+//   // Update motor speed
+//   analogWrite(motorSpeedPin, motorSpeed);
+
+//   // Print info if sensor status or motor direction changes
+//   if (sensorStatus != prevSensorStatus || direction != prevDirection) {
+//     Serial.print("Sensor Status: ");
+//     Serial.println(sensorStatus);
+//     Serial.print("Motor Direction: ");
+//     Serial.println(direction);
+//     Serial.println();
+//     prevSensorStatus = sensorStatus;
+//     prevDirection = direction;
+//   }
+
+//   // Optionally, you can add delays or other logic here as needed
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-// Replace with your network credentials
+/* ================= WIFI ================= */
 const char *ssid = "<3";
 const char *password = "baophansayhi";
 
-// Define GPIO pins for DC Motor
+/* ================= PHẦN CỨNG ================= */
 #define lineSensor D5
 #define motorPin1 D1
 #define motorPin2 D2
 #define motorSpeedPin D4
 
-// Create AsyncWebServer object on port 80
+/* ================= BIẾN ================= */
 AsyncWebServer server(80);
+int motorSpeed = 0;          // Tốc độ động cơ 0-255
+int motorDirection = 0;      // 0 = Stop, 1 = CW, 2 = CCW
+String motorState = "Stopped";
 
-// Variables to save values from HTML form
-const char *PARAM_INPUT = "speed";
-
-String direction = "Stopped";  // Motor direction
-int motorSpeed = 0;           // Motor speed (0-255)
-
-// Read line sensor
-String readLineSensor() {
-  return (digitalRead(lineSensor) == HIGH) ? "black" : "white";
-}
-
-// HTML content
+/* ================= HTML ================= */
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>DC Motor & Sensor</title>
+  <title>DC Motor & Line Sensor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <h1>DC Motor Control</h1>
-  <h2>Sensor Reading</h2>
-  <p>Line Sensor Status: <span id="line">%LINE%</span></p>
-  <h2>Motor Status</h2>
-  <p>Motor Direction: <span id="direction">%DIRECTION%</span></p>
+  <h2>ESP8266 Motor Control</h2>
+  <h3>Line Sensor:</h3>
+  <p>Status: <span id="line">%LINE%</span></p>
+
+  <h3>Motor Status:</h3>
+  <p>Direction: <span id="direction">%DIRECTION%</span></p>
+
   <form id="motorForm">
-    <label for="speed">Motor Speed (0-255): </label>
-    <input type="number" name="speed" min="0" max="255" required>
-    <input type="submit" value="Set Speed">
+    <label>Speed (0-255):</label><br>
+    <input type="number" name="speed" min="0" max="255"><br><br>
+
+    <label>Direction:</label><br>
+    <select name="direction">
+      <option value="0">Stop</option>
+      <option value="1">Clockwise</option>
+      <option value="2">Counter Clockwise</option>
+    </select><br><br>
+
+    <input type="submit" value="Update">
   </form>
+
   <script>
-    document.getElementById('motorForm').addEventListener('submit', function (e) {
+    document.getElementById("motorForm").addEventListener("submit", function(e){
       e.preventDefault();
-      const formData = new FormData(this);
-      fetch("/", {
-        method: "POST",
-        body: formData
-      }).then(response => response.text()).catch(error => console.error("Error:", error));
+      fetch("/", { method:"POST", body:new FormData(this) });
     });
 
-    setInterval(function() {
+    setInterval(() => {
       fetch("/status")
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
           document.getElementById("line").innerHTML = data.line;
           document.getElementById("direction").innerHTML = data.direction;
-        })
-        .catch(error => console.error("Error:", error));
+        });
     }, 2000);
   </script>
 </body>
 </html>
 )rawliteral";
 
-// Replace placeholder in HTML
+/* ================= HTML PROCESSOR ================= */
 String processor(const String &var) {
-  if (var == "LINE") {
-    return readLineSensor();
-  } else if (var == "DIRECTION") {
-    return direction;
-  }
+  if (var == "LINE") return (digitalRead(lineSensor) == HIGH) ? "black" : "white";
+  if (var == "DIRECTION") return motorState;
   return String();
 }
 
+/* ================= WIFI ================= */
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
+    delay(500);
+    Serial.print(".");
   }
-  Serial.println("\nConnected! IP Address: ");
+  Serial.println("\nWiFi Connected!");
   Serial.println(WiFi.localIP());
 }
 
+/* ================= SETUP ================= */
 void setup() {
-  // Initialize Serial Monitor
   Serial.begin(9600);
-
-  // Initialize WiFi
   initWiFi();
 
-  // Set up line sensor
   pinMode(lineSensor, INPUT);
-
-  // Set up motor control pins
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
   pinMode(motorSpeedPin, OUTPUT);
 
-  // Web server routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String jsonResponse = "{\"line\":\"" + readLineSensor() + "\",\"direction\":\"" + direction + "\"}";
-    request->send(200, "application/json", jsonResponse);
+    String json = "{\"line\":\"" + ((digitalRead(lineSensor) == HIGH) ? "black" : "white") +
+                  "\",\"direction\":\"" + motorState + "\"}";
+    request->send(200, "application/json", json);
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam(PARAM_INPUT, true)) {
-      motorSpeed = request->getParam(PARAM_INPUT, true)->value().toInt();
-      Serial.print("Motor speed set to: ");
-      Serial.println(motorSpeed);
-    }
-    request->send(200, "text/plain", "Settings updated");
+    if (request->hasParam("speed", true))
+      motorSpeed = request->getParam("speed", true)->value().toInt();
+
+    if (request->hasParam("direction", true))
+      motorDirection = request->getParam("direction", true)->value().toInt();
+
+    request->send(200, "text/plain", "OK");
   });
 
-  // Start server
   server.begin();
 }
 
+/* ================= LOOP ================= */
 void loop() {
-  static String prevDirection = "";   // Previous motor direction
-  static String prevSensorStatus = ""; // Previous sensor status
+  // --------- Đọc cảm biến (chỉ hiển thị) ---------
+  String sensorStatus = (digitalRead(lineSensor) == HIGH) ? "black" : "white";
 
-  // Read sensor status
-  String sensorStatus = readLineSensor();
-
-  // Determine motor direction based on sensor status
-  if (sensorStatus == "white" && motorSpeed > 0) {
-    direction = "Clockwise";
-    digitalWrite(motorPin1, LOW);
-    digitalWrite(motorPin2, HIGH);
-  } else if (sensorStatus == "black" && motorSpeed > 0) {
-    direction = "Counterclockwise";
-    digitalWrite(motorPin1, HIGH);
-    digitalWrite(motorPin2, LOW);
-  } else if (motorSpeed == 0) {
-    direction = "Stopped";
-    // Stop the motor
-    digitalWrite(motorPin1, LOW);
-    digitalWrite(motorPin2, LOW);
+  // --------- Điều khiển động cơ theo web ---------
+  switch (motorDirection) {
+    case 0:
+      motorState = "Stopped";
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      break;
+    case 1:
+      motorState = "Clockwise";
+      digitalWrite(motorPin1, HIGH);
+      digitalWrite(motorPin2, LOW);
+      break;
+    case 2:
+      motorState = "Counter Clockwise";
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, HIGH);
+      break;
   }
 
-  // Update motor speed
   analogWrite(motorSpeedPin, motorSpeed);
 
-  // Print info if sensor status or motor direction changes
-  if (sensorStatus != prevSensorStatus || direction != prevDirection) {
-    Serial.print("Sensor Status: ");
-    Serial.println(sensorStatus);
-    Serial.print("Motor Direction: ");
-    Serial.println(direction);
-    Serial.println();
-    prevSensorStatus = sensorStatus;
-    prevDirection = direction;
-  }
+  // Optional: in ra Serial để debug
+  Serial.print("Line Sensor: "); Serial.print(sensorStatus);
+  Serial.print(" | Motor: "); Serial.print(motorState);
+  Serial.print(" | Speed: "); Serial.println(motorSpeed);
 
-  // Optionally, you can add delays or other logic here as needed
+  delay(200);
 }

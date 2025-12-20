@@ -1,3 +1,168 @@
+// #include <ESP8266WiFi.h>
+// #include <ESP8266WebServer.h>
+// #include <Servo.h>
+
+// // ================= WIFI =================
+// const char* ssid = "NGOC HOA";
+// const char* password = "home1234";
+
+// // ================= PIN ==================
+// #define JOYSTICK_PIN A0
+// #define SERVO_PIN    D1
+
+// // ================= OBJECT ===============
+// Servo myServo;
+// ESP8266WebServer server(80);
+
+// // ================= BIẾN =================
+// int joyVal = 0;
+// int angleLeft  = 0;
+// int angleRight = 0;
+// bool isApplied = false;
+
+// // ngưỡng joystick
+// const int LEFT_TH  = 300;
+// const int RIGHT_TH = 700;
+
+// // timer servo
+// unsigned long prevMillis = 0;
+// const unsigned long interval = 400; // ms
+// bool servoState = false;
+
+// // ================= WEB ==================
+// void handleRoot() {
+//   String html = R"=====(
+// <!DOCTYPE html>
+// <html>
+// <head>
+// <meta charset="utf-8">
+// <title>Servo Joystick</title>
+// <script>
+// setInterval(()=>{
+//   fetch('/sensor')
+//     .then(r=>r.json())
+//     .then(d=>document.getElementById('joy').innerHTML=d.val);
+// },300);
+
+// function applyAngle(){
+//   let l=document.getElementById('left').value;
+//   let r=document.getElementById('right').value;
+//   fetch(/set?l=${l}&r=${r});
+// }
+
+// function stopServo(){
+//   fetch('/stop');
+// }
+// </script>
+// </head>
+// <body>
+// <h2>Joystick:</h2>
+// <h1 id="joy">---</h1>
+
+// <hr>
+
+// <p>Góc TRÁI (joystick &lt; 300)</p>
+// <input type="number" id="left" min="0" max="180">
+
+// <p>Góc PHẢI (joystick &gt; 700)</p>
+// <input type="number" id="right" min="0" max="180">
+
+// <br><br>
+// <button onclick="applyAngle()">APPLY</button>
+// <button onclick="stopServo()">STOP</button>
+
+// </body>
+// </html>
+// )=====";
+//   server.send(200, "text/html", html);
+// }
+
+// void handleSensor() {
+//   joyVal = analogRead(JOYSTICK_PIN);
+//   server.send(200, "application/json",
+//               "{\"val\":" + String(joyVal) + "}");
+// }
+
+// void handleSet() {
+//   angleLeft  = constrain(server.arg("l").toInt(), 0, 180);
+//   angleRight = constrain(server.arg("r").toInt(), 0, 180);
+//   isApplied = true;
+
+//   Serial.println("APPLY");
+//   Serial.println("LEFT  = " + String(angleLeft));
+//   Serial.println("RIGHT = " + String(angleRight));
+
+//   server.send(200, "text/plain", "OK");
+// }
+
+// void handleStop() {
+//   isApplied = false;
+//   myServo.write(0);
+//   server.send(200, "text/plain", "STOP");
+// }
+
+// // ================= SETUP ================
+// void setup() {
+//   Serial.begin(115200);
+
+//   myServo.attach(SERVO_PIN, 500, 2500);
+//   myServo.write(0);
+
+//   WiFi.begin(ssid, password);
+//   while (WiFi.status() != WL_CONNECTED) {
+//     delay(500); Serial.print(".");
+//   }
+//   Serial.println("\nIP:");
+//   Serial.println(WiFi.localIP());
+
+//   server.on("/", handleRoot);
+//   server.on("/sensor", handleSensor);
+//   server.on("/set", handleSet);
+//   server.on("/stop", handleStop);
+//   server.begin();
+// }
+
+// // ================= LOOP =================
+// void loop() {
+//   server.handleClient();
+//   joyVal = analogRead(JOYSTICK_PIN);
+//   unsigned long now = millis();
+
+//   // chưa APPLY → dừng
+//   if (!isApplied) {
+//     myServo.write(0);
+//     servoState = false;
+//     return;
+//   }
+
+//   // SANG PHẢI
+//   if (joyVal > RIGHT_TH) {
+//     if (now - prevMillis >= interval) {
+//       prevMillis = now;
+//       servoState = !servoState;
+//       myServo.write(servoState ? angleRight : 0);
+//       delay(500);
+//     }
+//   }
+//   // SANG TRÁI
+//   else if (joyVal < LEFT_TH) {
+//     if (now - prevMillis >= interval) {
+//       prevMillis = now;
+//       servoState = !servoState;
+//       myServo.write(servoState ? angleLeft : 0);
+//         delay(500);
+//     }
+//   }
+//   // THẢ JOYSTICK
+//   else {
+//     myServo.write(0);
+//     servoState = false;
+//   }
+// }
+
+
+
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <Servo.h>
@@ -10,44 +175,42 @@ const char* password = "home1234";
 #define JOYSTICK_PIN A0
 #define SERVO_PIN    D1
 
-// ================= OBJECT ===============
+// ================= OBJECT =================
 Servo myServo;
 ESP8266WebServer server(80);
 
 // ================= BIẾN =================
-int joyVal = 0;
-int angleLeft  = 0;
-int angleRight = 0;
-bool isApplied = false;
+int joyVal = 0;           // Giá trị joystick
+int angleLeft  = 0;       // Góc khi joystick sang trái
+int angleRight = 0;       // Góc khi joystick sang phải
+bool isApplied = false;   // Cho phép servo hoạt động
 
-// ngưỡng joystick
+// Ngưỡng joystick
 const int LEFT_TH  = 300;
 const int RIGHT_TH = 700;
 
-// timer servo
+// Timer dao động servo
 unsigned long prevMillis = 0;
 const unsigned long interval = 400; // ms
 bool servoState = false;
 
-// ================= WEB ==================
+// ================= HTML ==================
 void handleRoot() {
-  String html = R"=====(
-<!DOCTYPE html>
+  String html = R"=====(<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Servo Joystick</title>
 <script>
 setInterval(()=>{
-  fetch('/sensor')
-    .then(r=>r.json())
+  fetch('/sensor').then(r=>r.json())
     .then(d=>document.getElementById('joy').innerHTML=d.val);
 },300);
 
 function applyAngle(){
   let l=document.getElementById('left').value;
   let r=document.getElementById('right').value;
-  fetch(/set?l=${l}&r=${r});
+  fetch(`/set?l=${l}&r=${r}`);
 }
 
 function stopServo(){
@@ -58,40 +221,71 @@ function stopServo(){
 <body>
 <h2>Joystick:</h2>
 <h1 id="joy">---</h1>
-
 <hr>
-
 <p>Góc TRÁI (joystick &lt; 300)</p>
 <input type="number" id="left" min="0" max="180">
-
 <p>Góc PHẢI (joystick &gt; 700)</p>
 <input type="number" id="right" min="0" max="180">
-
 <br><br>
 <button onclick="applyAngle()">APPLY</button>
 <button onclick="stopServo()">STOP</button>
-
 </body>
 </html>
 )=====";
   server.send(200, "text/html", html);
 }
 
-void handleSensor() {
+// ================= MODULE CẢM BIẾN ==================
+int readJoystick() {
   joyVal = analogRead(JOYSTICK_PIN);
-  server.send(200, "application/json",
-              "{\"val\":" + String(joyVal) + "}");
+  return joyVal;
+}
+
+// ================= MODULE SERVO ==================
+void updateServo() {
+  unsigned long now = millis();
+
+  if (!isApplied) {           // chưa APPLY → dừng servo
+    myServo.write(0);
+    servoState = false;
+    return;
+  }
+
+  // SANG PHẢI
+  if (joyVal > RIGHT_TH) {
+    if (now - prevMillis >= interval) {
+      prevMillis = now;
+      servoState = !servoState;
+      myServo.write(servoState ? angleRight : 0);
+    }
+  }
+  // SANG TRÁI
+  else if (joyVal < LEFT_TH) {
+    if (now - prevMillis >= interval) {
+      prevMillis = now;
+      servoState = !servoState;
+      myServo.write(servoState ? angleLeft : 0);
+    }
+  }
+  // THẢ JOYSTICK
+  else {
+    myServo.write(0);
+    servoState = false;
+  }
+}
+
+// ================= WEB HANDLERS ==================
+void handleSensor() {
+  server.send(200, "application/json", "{\"val\":" + String(joyVal) + "}");
 }
 
 void handleSet() {
   angleLeft  = constrain(server.arg("l").toInt(), 0, 180);
   angleRight = constrain(server.arg("r").toInt(), 0, 180);
   isApplied = true;
-
   Serial.println("APPLY");
   Serial.println("LEFT  = " + String(angleLeft));
   Serial.println("RIGHT = " + String(angleRight));
-
   server.send(200, "text/plain", "OK");
 }
 
@@ -101,10 +295,11 @@ void handleStop() {
   server.send(200, "text/plain", "STOP");
 }
 
-// ================= SETUP ================
+// ================= SETUP ==================
 void setup() {
   Serial.begin(115200);
 
+  pinMode(JOYSTICK_PIN, INPUT);
   myServo.attach(SERVO_PIN, 500, 2500);
   myServo.write(0);
 
@@ -122,40 +317,16 @@ void setup() {
   server.begin();
 }
 
-// ================= LOOP =================
+// ================= LOOP ==================
 void loop() {
   server.handleClient();
-  joyVal = analogRead(JOYSTICK_PIN);
-  unsigned long now = millis();
 
-  // chưa APPLY → dừng
-  if (!isApplied) {
-    myServo.write(0);
-    servoState = false;
-    return;
-  }
+  // 1️⃣ Đọc cảm biến joystick
+  readJoystick();
 
-  // SANG PHẢI
-  if (joyVal > RIGHT_TH) {
-    if (now - prevMillis >= interval) {
-      prevMillis = now;
-      servoState = !servoState;
-      myServo.write(servoState ? angleRight : 0);
-      delay(500);
-    }
-  }
-  // SANG TRÁI
-  else if (joyVal < LEFT_TH) {
-    if (now - prevMillis >= interval) {
-      prevMillis = now;
-      servoState = !servoState;
-      myServo.write(servoState ? angleLeft : 0);
-        delay(500);
-    }
-  }
-  // THẢ JOYSTICK
-  else {
-    myServo.write(0);
-    servoState = false;
-  }
+  // 2️⃣ Cập nhật servo dao động độc lập
+  updateServo();
+
+  // 3️⃣ Debug
+  Serial.print("Joystick Value: "); Serial.println(joyVal);
 }

@@ -4,8 +4,9 @@
 #include <Stepper.h>
 
 // Replace with your network credentials
-const char *ssid = "Tran Thi Kim Loan";
-const char *password = "01229333995";
+// Thông tin WiFi
+const char *ssid = "NGOC HOA";
+const char *password = "home1234";
 
 // Define GPIO pins for Stepper Motor
 #define lineSensor D5
@@ -107,7 +108,7 @@ void setup() {
   pinMode(lineSensor, INPUT);
 
   // Configure stepper motor
-  myStepper.setSpeed(5);
+  myStepper.setSpeed(10);
 
   // Web server routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {

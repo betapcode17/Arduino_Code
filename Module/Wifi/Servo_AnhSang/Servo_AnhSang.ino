@@ -18,6 +18,12 @@ int lightValue = 0;
 int angleConditionMet = 90;      // Góc khi ánh sáng MẠNH
 int angleConditionNotMet = 0;    // Góc khi ánh sáng YẾU
 
+// DAO ĐỘNG SERVO (GIỐNG CODE LINE SENSOR)
+unsigned long prevMillis = 0;
+const unsigned long interval = 400;  // Thời gian dao động (ms)
+bool servoState = false;
+int targetAngle = 0;
+
 // ================= WEB SERVER =================
 AsyncWebServer server(80);
 
@@ -33,6 +39,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   <h2>ESP8266 Light Sensor + Servo</h2>
 
   <p>Light Sensor Value: <b><span id="light">%LIGHT%</span></b></p>
+  <p>Light Condition: <b><span id="condition">---</span></b></p>
 
   <form id="servoForm">
     <label>Angle (Light Strong):</label><br>
@@ -53,8 +60,11 @@ const char index_html[] PROGMEM = R"rawliteral(
     setInterval(() => {
       fetch("/status")
         .then(r => r.json())
-        .then(d => document.getElementById("light").innerHTML = d.light);
-    }, 2000);
+        .then(d => {
+          document.getElementById("light").innerHTML = d.light;
+          document.getElementById("condition").innerHTML = d.condition;
+        });
+    }, 1000);
   </script>
 </body>
 </html>
@@ -65,12 +75,6 @@ const char index_html[] PROGMEM = R"rawliteral(
 // Đọc cảm biến ánh sáng
 int readLightSensor() {
   return analogRead(lightSensor);
-}
-
-// 🔥 CHUYỂN GÓC → XUNG SERVO (CHUẨN ESP8266)
-int angleToPulse(int angle) {
-  angle = constrain(angle, 0, 180);
-  return map(angle, 0, 180, 1000, 2000);
 }
 
 // Xử lý HTML
@@ -105,9 +109,9 @@ void setup() {
 
   pinMode(lightSensor, INPUT);
 
-  // ⚠️ Attach servo chuẩn cho ESP8266
+  // Attach servo
   myServo.attach(servoPin, 500, 2500);
-  myServo.writeMicroseconds(angleToPulse(0));
+  myServo.write(0);  // Bắt đầu từ 0 độ
 
   // ===== WEB =====
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -115,8 +119,10 @@ void setup() {
   });
 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String conditionStr = (lightValue < 800) ? "STRONG Light" : "WEAK Light";
     request->send(200, "application/json",
-      "{\"light\":\"" + String(lightValue) + "\"}");
+      "{\"light\":\"" + String(lightValue) + 
+      "\", \"condition\":\"" + conditionStr + "\"}");
   });
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -139,22 +145,41 @@ void setup() {
 
 // ================= LOOP =================
 void loop() {
+  unsigned long now = millis();
+  
+  // Đọc cảm biến ánh sáng
   lightValue = readLightSensor();
-  Serial.print("Light Sensor Value: ");
-  Serial.println(lightValue);
-
-  // 🌞 ÁNH SÁNG MẠNH → GIÁ TRỊ NHỎ
+  
+  // Xác định góc mục tiêu dựa trên điều kiện ánh sáng
+  // 🌞 ÁNH SÁNG MẠNH → GIÁ TRỊ NHỎ (< 800)
   if (lightValue < 800) {
-    myServo.writeMicroseconds(angleToPulse(angleConditionMet));
+    targetAngle = angleConditionMet;
   }
-  // 🌑 ÁNH SÁNG YẾU → GIÁ TRỊ LỚN
+  // 🌑 ÁNH SÁNG YẾU → GIÁ TRỊ LỚN (>= 800)
   else {
-    myServo.writeMicroseconds(angleToPulse(angleConditionNotMet));
+    targetAngle = angleConditionNotMet;
   }
-
-  delay(500);  // Giữ góc
-
-  // Quay về 0 độ
-  myServo.writeMicroseconds(angleToPulse(0));
-  delay(500);
+  
+  // ===== DAO ĐỘNG SERVO 0 ↔ GÓC MỤC TIÊU =====
+  // Giống với code cảm biến dò line
+  if (now - prevMillis >= interval) {
+    prevMillis = now;
+    servoState = !servoState;
+    
+    // Dao động giữa 0 độ và góc mục tiêu
+    if (servoState) {
+      myServo.write(targetAngle);
+      Serial.print("Servo to target angle: ");
+      Serial.print(targetAngle);
+    } else {
+      myServo.write(0);
+      Serial.print("Servo to 0 degree");
+    }
+    
+    // In thông tin debug
+    Serial.print(" | Light: ");
+    Serial.print(lightValue);
+    Serial.print(" | Condition: ");
+    Serial.println((lightValue < 800) ? "STRONG" : "WEAK");
+  }
 }

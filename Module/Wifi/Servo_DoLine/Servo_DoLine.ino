@@ -3,134 +3,107 @@
 #include <ESPAsyncWebServer.h>
 #include <Servo.h>
 
-// ================= WiFi =================
+// ================= WIFI =================
 const char *ssid = "NGOC HOA";
 const char *password = "home1234";
 
 // ================= PHẦN CỨNG =================
-#define lineSensorPin D5
-#define servoPin      D1
+#define LINE_SENSOR_PIN D5
+#define SERVO_PIN       D1
 
 Servo myServo;
+AsyncWebServer server(80);
 
 // ================= BIẾN =================
 String lineSensorStateStr = "White";
 
-int angleConditionMet = 90;     // Có line (đen)
-int angleConditionNotMet = 0;   // Không line (trắng)
+int angleLine = 90;     // Có line (đen)
+int angleNoLine = 0;    // Không line (trắng)
 
-// ================= WEB SERVER =================
-AsyncWebServer server(80);
+// DAO ĐỘNG SERVO (GIỐNG CODE JOYSTICK)
+unsigned long prevMillis = 0;
+const unsigned long interval = 400;
+bool servoState = false;
 
 // ================= HTML =================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Line Sensor Servo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  <h2>ESP8266 Line Sensor + Servo</h2>
-  <p>Line Sensor State: <b><span id="sensorState">%SENSORSTATE%</span></b></p>
-
-  <form id="servoForm">
-    <label>Angle (Line Detected):</label><br>
-    <input type="number" name="angleMet" min="0" max="180" required><br><br>
-
-    <label>Angle (No Line):</label><br>
-    <input type="number" name="angleNotMet" min="0" max="180" required><br><br>
-
-    <input type="submit" value="Update">
-  </form>
-
-  <script>
-    document.getElementById("servoForm").addEventListener("submit", function(e){
-      e.preventDefault();
-      fetch("/", { method:"POST", body:new FormData(this) });
+<meta charset="utf-8">
+<title>Line Sensor Servo</title>
+<script>
+setInterval(()=>{
+  fetch('/status')
+    .then(r=>r.json())
+    .then(d=>{
+      document.getElementById('state').innerHTML=d.state;
     });
+},1000);
 
-    setInterval(() => {
-      fetch("/status")
-        .then(r => r.json())
-        .then(d => document.getElementById("sensorState").innerHTML = d.state);
-    }, 1000);
-  </script>
+function apply(){
+  let a1=document.getElementById('a1').value;
+  let a2=document.getElementById('a2').value;
+  fetch(`/set?l=${a1}&n=${a2}`);
+}
+</script>
+</head>
+
+<body>
+<h2>Line Sensor</h2>
+<p>State: <b><span id="state">---</span></b></p>
+
+<hr>
+
+<h3>Servo Angles</h3>
+<p>Angle when BLACK line</p>
+<input id="a1" type="number" min="0" max="180">
+
+<p>Angle when WHITE surface</p>
+<input id="a2" type="number" min="0" max="180">
+
+<br><br>
+<button onclick="apply()">APPLY</button>
 </body>
 </html>
 )rawliteral";
 
-// ================= HÀM =================
-int readLineSensor() {
-  return digitalRead(lineSensorPin);
-}
-
-int angleToPulse(int angle) {
-  angle = constrain(angle, 0, 180);
-  return map(angle, 0, 180, 1000, 2000);
-}
-
-
-String processor(const String &var) {
-  if (var == "SENSORSTATE") return lineSensorStateStr;
-  return String();
-}
-
+// ================= WIFI =================
 void initWiFi() {
-  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    delay(500); Serial.print(".");
   }
-  Serial.println("\nConnected! IP:");
-  Serial.println(WiFi.localIP());
+  Serial.println("\nIP: " + WiFi.localIP().toString());
 }
 
 // ================= SETUP =================
 void setup() {
   Serial.begin(9600);
 
+  pinMode(LINE_SENSOR_PIN, INPUT);
   initWiFi();
-Serial.println("================================");
-Serial.println("ESP8266 Web Server Started");
-Serial.print("Web Address: http://");
-Serial.println(WiFi.localIP());
-Serial.println("================================");
- 
 
+  myServo.attach(SERVO_PIN, 500, 2500);
+  myServo.write(0);
 
-
-  pinMode(lineSensorPin, INPUT);
-
-  // ⚠️ ATTACH SERVO CHUẨN ESP8266
-  myServo.attach(servoPin, 500, 2500);
-  myServo.writeMicroseconds(angleToPulse(0));
-
-  // ===== WEB =====
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", index_html, processor);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r){
+    r->send_P(200, "text/html", index_html);
   });
 
-  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json",
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *r){
+    r->send(200, "application/json",
       "{\"state\":\"" + lineSensorStateStr + "\"}");
   });
 
-  server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("angleMet", true))
-      angleConditionMet = request->getParam("angleMet", true)->value().toInt();
+  server.on("/set", HTTP_GET, [](AsyncWebServerRequest *r){
+    if (r->hasParam("l"))
+      angleLine = constrain(r->getParam("l")->value().toInt(),0,180);
+    if (r->hasParam("n"))
+      angleNoLine = constrain(r->getParam("n")->value().toInt(),0,180);
 
-    if (request->hasParam("angleNotMet", true))
-      angleConditionNotMet = request->getParam("angleNotMet", true)->value().toInt();
-
-    Serial.print("Line: ");
-    Serial.print(angleConditionMet);
-    Serial.print(" | No Line: ");
-    Serial.println(angleConditionNotMet);
-
-    request->send(200, "text/plain", "OK");
+    Serial.println("Updated angles");
+    r->send(200,"text/plain","OK");
   });
 
   server.begin();
@@ -138,21 +111,23 @@ Serial.println("================================");
 
 // ================= LOOP =================
 void loop() {
-  int lineSensorState = readLineSensor();
+  unsigned long now = millis();
 
-  if (lineSensorState == HIGH) {   // Line đen
+  int lineState = digitalRead(LINE_SENSOR_PIN);
+  int targetAngle;
+
+  if (lineState == HIGH) {
     lineSensorStateStr = "Black";
-    myServo.writeMicroseconds(angleToPulse(angleConditionMet));
-  } else {                         // Line trắng
+    targetAngle = angleLine;
+  } else {
     lineSensorStateStr = "White";
-    myServo.writeMicroseconds(angleToPulse(angleConditionNotMet));
+    targetAngle = angleNoLine;
   }
 
-  Serial.println(lineSensorStateStr);
-
-  delay(500);  // Giữ góc
-
-  // Quay về 0 độ
-  myServo.writeMicroseconds(angleToPulse(0));
-  delay(500);
+  // ===== DAO ĐỘNG SERVO 0 ↔ GÓC =====
+  if (now - prevMillis >= interval) {
+    prevMillis = now;
+    servoState = !servoState;
+    myServo.write(servoState ? targetAngle : 0);
+  }
 }

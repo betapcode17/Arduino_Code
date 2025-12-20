@@ -1,153 +1,246 @@
+// #include <ESP8266WiFi.h>
+// #include <ESPAsyncTCP.h>
+// #include <ESPAsyncWebServer.h>
+// #include <Servo.h>
+
+// // ================= WIFI =================
+// const char *ssid = "NGOC HOA";
+// const char *password = "home1234";
+
+// // ================= PHẦN CỨNG =================
+// #define GAS_PIN   A0
+// #define SERVO_PIN D1
+
+// Servo myServo;
+// AsyncWebServer server(80);
+
+// // ================= BIẾN =================
+// int gasValue = 0;
+// int angleGas = 90;
+// int angleNoGas = 0;
+// int gasThreshold = 120;
+
+// // DAO ĐỘNG SERVO (GIỐNG CODE JOYSTICK)
+// unsigned long prevMillis = 0;
+// const unsigned long interval = 400;
+// bool servoState = false;
+
+// // ================= HTML =================
+// const char index_html[] PROGMEM = R"rawliteral(
+// <!DOCTYPE html>
+// <html>
+// <head><meta charset="utf-8"><title>Gas Servo</title></head>
+// <body>
+// <h2>Gas Sensor</h2>
+// <p>Gas Value: <b><span id="gas">---</span></b></p>
+
+// <hr>
+
+// <p>Angle when GAS detected</p>
+// <input id="g1" type="number" min="0" max="180">
+
+// <p>Angle when NO GAS</p>
+// <input id="g2" type="number" min="0" max="180">
+
+// <br><br>
+// <button onclick="apply()">APPLY</button>
+
+// <script>
+// setInterval(()=>{
+//   fetch('/status').then(r=>r.json())
+//   .then(d=>document.getElementById('gas').innerHTML=d.gas);
+// },1000);
+
+// function apply(){
+//   fetch(`/set?a=${g1.value}&b=${g2.value}`);
+// }
+// </script>
+// </body>
+// </html>
+// )rawliteral";
+
+// // ================= SETUP =================
+// void setup() {
+//   Serial.begin(115200);
+
+//   WiFi.begin(ssid, password);
+//   while (WiFi.status() != WL_CONNECTED) delay(500);
+
+//   myServo.attach(SERVO_PIN, 500, 2500);
+//   myServo.write(0);
+
+//   server.on("/", HTTP_GET, [](AsyncWebServerRequest *r){
+//     r->send_P(200, "text/html", index_html);
+//   });
+
+//   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *r){
+//     r->send(200, "application/json",
+//       "{\"gas\":" + String(gasValue) + "}");
+//   });
+
+//   server.on("/set", HTTP_GET, [](AsyncWebServerRequest *r){
+//     angleGas = constrain(r->getParam("a")->value().toInt(),0,180);
+//     angleNoGas = constrain(r->getParam("b")->value().toInt(),0,180);
+//     r->send(200,"text/plain","OK");
+//   });
+
+//   server.begin();
+// }
+
+// // ================= LOOP =================
+// void loop() {
+//   gasValue = analogRead(GAS_PIN);
+//   unsigned long now = millis();
+
+//   int targetAngle = (gasValue > gasThreshold) ? angleGas : angleNoGas;
+
+//   if (now - prevMillis >= interval) {
+//     prevMillis = now;
+//     servoState = !servoState;
+//     myServo.write(servoState ? targetAngle : 0);
+//   }
+// }
+
+
+
+
+
+
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <Servo.h>
 
-// ================= WiFi =================
+// ================= WIFI =================
 const char *ssid = "NGOC HOA";
 const char *password = "home1234";
 
 // ================= PHẦN CỨNG =================
-#define gasSensor A0
-#define servoPin  D1
+#define SERVO_PIN D1
+#define GAS_PIN   A0
 
 Servo myServo;
-
-// ================= BIẾN =================
-int gasValue = 0;
-int angleConditionMet = 0;
-int angleConditionNotMet = 0;
-
-// ================= WEB SERVER =================
 AsyncWebServer server(80);
+
+// ================= BIẾN SERVO =================
+int servoAngle = 0;
+bool isApplied = false;
+
+// DAO ĐỘNG SERVO (GIỐNG CODE JOYSTICK)
+unsigned long prevMillis = 0;
+const unsigned long interval = 400;
+bool servoState = false;
+
+// ================= BIẾN CẢM BIẾN =================
+int gasValue = 0;
 
 // ================= HTML =================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Servo Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  <h2>ESP8266 Gas + Servo</h2>
-  <p>Gas Sensor Value: <b><span id="gas">%GAS%</span></b></p>
-
-  <form id="servoForm">
-    <label>Angle (Gas Detected):</label><br>
-    <input type="number" name="angleMet" min="0" max="180" required><br><br>
-
-    <label>Angle (No Gas):</label><br>
-    <input type="number" name="angleNotMet" min="0" max="180" required><br><br>
-
-    <input type="submit" value="Update">
-  </form>
-
-  <script>
-    document.getElementById("servoForm").addEventListener("submit", function(e){
-      e.preventDefault();
-      fetch("/", { method:"POST", body:new FormData(this) });
+<meta charset="utf-8">
+<title>Servo Manual + Gas Display</title>
+<script>
+setInterval(()=>{
+  fetch('/status')
+    .then(r=>r.json())
+    .then(d=>{
+      document.getElementById('gas').innerHTML = d.gas;
     });
+},1000);
 
-    setInterval(() => {
-      fetch("/status")
-        .then(r => r.json())
-        .then(d => document.getElementById("gas").innerHTML = d.gas);
-    }, 2000);
-  </script>
+function apply(){
+  let a=document.getElementById('a').value;
+  fetch(`/set?a=${a}`);
+}
+function stopServo(){
+  fetch('/stop');
+}
+</script>
+</head>
+
+<body>
+<h2>Gas Sensor (Display Only)</h2>
+<p>Gas value: <b><span id="gas">---</span></b></p>
+
+<hr>
+
+<h2>Manual Servo Control</h2>
+<p>Servo Angle (0-180)</p>
+<input id="a" type="number" min="0" max="180">
+
+<br><br>
+<button onclick="apply()">APPLY</button>
+<button onclick="stopServo()">STOP</button>
+
 </body>
 </html>
 )rawliteral";
 
-// ================= HÀM =================
-int readGasSensor() {
-  return analogRead(gasSensor);
-}
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
 
-int angleToPulse(int angle) {
-  angle = constrain(angle, 0, 180);
-  return map(angle, 0, 180, 1000, 2000);
-}
+  pinMode(GAS_PIN, INPUT);
 
-
-String processor(const String &var) {
-  if (var == "GAS") return String(gasValue);
-  return String();
-}
-
-void initWiFi() {
-  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nConnected! IP: ");
-  Serial.println(WiFi.localIP());
-}
+  Serial.println("\nIP: " + WiFi.localIP().toString());
 
-// ================= SETUP =================
-void setup() {
-  Serial.begin(9600);
-
-  initWiFi();
-Serial.println("================================");
-Serial.println("ESP8266 Web Server Started");
-Serial.print("Web Address: http://");
-Serial.println(WiFi.localIP());
-Serial.println("================================");
- 
-
-
-  pinMode(gasSensor, INPUT);
-
-  // ⚠️ ATTACH SERVO CHUẨN ESP8266
-  myServo.attach(servoPin, 500, 2500);
-  myServo.writeMicroseconds(angleToPulse(0));
+  myServo.attach(SERVO_PIN, 500, 2500);
+  myServo.write(0);
 
   // ===== WEB =====
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", index_html, processor);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r){
+    r->send_P(200, "text/html", index_html);
   });
 
-  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json",
-      "{\"gas\":\"" + String(gasValue) + "\"}");
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *r){
+    r->send(200, "application/json",
+      "{\"gas\":" + String(gasValue) + "}");
   });
 
-  server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("angleMet", true))
-      angleConditionMet = request->getParam("angleMet", true)->value().toInt();
+  server.on("/set", HTTP_GET, [](AsyncWebServerRequest *r){
+    if (r->hasParam("a")) {
+      servoAngle = constrain(r->getParam("a")->value().toInt(), 0, 180);
+      isApplied = true;
+      Serial.println("APPLY angle = " + String(servoAngle));
+    }
+    r->send(200, "text/plain", "OK");
+  });
 
-    if (request->hasParam("angleNotMet", true))
-      angleConditionNotMet = request->getParam("angleNotMet", true)->value().toInt();
-
-    Serial.print("Gas: ");
-    Serial.print(angleConditionMet);
-    Serial.print(" | No Gas: ");
-    Serial.println(angleConditionNotMet);
-
-    request->send(200, "text/plain", "OK");
+  server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *r){
+    isApplied = false;
+    servoState = false;
+    myServo.write(0);
+    r->send(200, "text/plain", "STOP");
   });
 
   server.begin();
 }
 
+// ================= LOOP =================
 void loop() {
-  gasValue = readGasSensor();
-  Serial.println(gasValue);
+  // CẢM BIẾN CHỈ ĐỂ HIỂN THỊ
+  gasValue = analogRead(GAS_PIN);
 
-  // Quay tới góc theo trạng thái gas
-  if (gasValue > 120) {
-    myServo.writeMicroseconds(angleToPulse(angleConditionMet));
-  } else {
-    myServo.writeMicroseconds(angleToPulse(angleConditionNotMet));
+  unsigned long now = millis();
+
+  // CHƯA APPLY → SERVO ĐỨNG
+  if (!isApplied) {
+    myServo.write(0);
+    servoState = false;
+    return;
   }
 
-  delay(500);   // Giữ góc 300ms
-  // Quay về 0 độ
-  myServo.writeMicroseconds(angleToPulse(0));
-  delay(500);   // Giữ 0 độ 300ms
+  // DAO ĐỘNG SERVO 0 ↔ GÓC NHẬP
+  if (now - prevMillis >= interval) {
+    prevMillis = now;
+    servoState = !servoState;
+    myServo.write(servoState ? servoAngle : 0);
+  }
 }
-

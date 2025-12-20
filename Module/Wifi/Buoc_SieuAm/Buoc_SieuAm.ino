@@ -73,7 +73,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           document.getElementById("direction").innerHTML = data.direction;
         })
         .catch(error => console.error("Error:", error));
-    }, 2000);
+    }, 1000);
   </script>
 </body>
 </html>
